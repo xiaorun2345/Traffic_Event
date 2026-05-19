@@ -1,0 +1,95 @@
+[gie]
+###检测网络的engine量化模型， 必须配置
+model_engine_file = best_v5_FP16.engine  
+
+###检测网络的模型,量化前，如果上述文件存在，不需要配置，否则需要配置
+model_file = ./weights/best_yolov5s_640_20211202.wts
+
+###检测的目标分类名称， 不需要修改
+label_names = car;bus;truck;person;motorbike;tricycle
+
+###量化精度， 不需要修改
+#### 0=INT8, 1=FP16  2=FP32 mode ####
+network_mode = 1        
+
+###检测类别个数， 一般不需要修改
+num_detected_classes = 6
+batch_size = 1
+nms_iou_threshold = 0.5
+pre-cluster-threshold = 0.1
+
+[tracker]
+###跟踪滤波阈值
+low_thresh = 0.5
+high_thresh = 0.7
+max_iou_thresh = 0.8
+
+std_measurement_x = 0.1
+std_measurement_y = 0.1
+std_state_ax = 0.4
+std_state_ay = 0.5
+
+speed_thresh = 2
+speed_converged_thresh = 1.5
+
+
+[NL_config]
+###摄像机设备ID
+camera_device_id = camera1
+
+###坐标系： 0=WGS84  1=GCJ02 默认为0
+coordinate_system = 0
+
+###标定文件, 必须配置
+calibration_file = ../config/cfg.json
+
+###字体文件， 必须配置
+font_file = ../config/simhei.ttf
+
+#ROI区域的顶点,必须顺时针选取至少4个点
+#roi_points0 = 0;0;1920;0;1920;1080;0;1080
+roi_points0 = 0;0;3840;0;3840;2160;0;2160
+
+###Plate ROI区域的顶点, 必须顺时针选取至少4个点; 
+### 没有车牌识别功能要求，需要注释掉下面配置；
+### 有车牌识别功能要求，改区域必须修改，且在上面的ROI区域内
+roi_plate_points = 10;1500;3800;1500;3800;2150;10;2150
+
+###初始航向角
+heading = 132.8
+
+###摄像机安装位置与正北方向交角, 安装位置的经度, 纬度, 海拔，必须配置（可与同杆件雷达的位置相同）
+camera_location_angle = 190.38
+camera_location_longitude = 118.01456025
+camera_location_latitude = 28.48643379
+camera_location_elevation = 0
+
+
+################################################################################
+# Link message for one road
+################################################################################
+
+[link0]
+###摄像头安装监控的车道流向，命名规则为v2x逻辑路网中的NodeID： 区域ID×100000+路口号
+###感知数据中的车道ID命名规则为：上游节点NodeID - 当前节点 NodeID
+
+link_id = 1000061-1000070
+heading = 265
+
+###行驶方向--> 0：来向close, 1：去向away ###
+direction = 1
+
+############### lane的个数，必填 #################
+lane_count = 2
+
+
+id_lane0 = 1000061-1000070#1
+type_lane0 = 0
+length_lane0 = 150
+points_lane0 = 603;51;682;48;481;545;145;545
+
+id_lane1 = 1000061-1000070#2
+type_lane1 = 0
+length_lane1 = 150
+points_lane1 = 680;50;762;50;828;530;480;548
+

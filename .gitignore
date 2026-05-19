@@ -1,0 +1,53 @@
+# 本地/编辑器
+.git/
+.agents/
+.codex/
+.vscode/
+.idea/
+*.swp
+*~
+
+# 构建产物
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# 运行产物
+output/
+*.log
+*.tmp
+core
+core.*
+
+# 本地敏感配置
+config/DealRCF.cfg
+config/*_DealRCF_*cfg
+
+# 二进制与大文件依赖
+lib/
+*.so
+*.so.*
+*.a
+*.deb
+*.rknn
+*.whl
+*.mp4
+*.avi
+*.mkv
+
+# 第三方库源码中的构建缓存/内嵌仓库
+ffmedia_release/.git/
+ffmedia_release/build/
+ffmedia_release/dist/
+ffmedia_release/inference_examples/
+3rdparty/aarch64/protobuf/lib/
+3rdparty/*/lib/
+3rdparty/*/build/
+
+# 历史测试数据
+data_to_event/
+*test*
+bak/
