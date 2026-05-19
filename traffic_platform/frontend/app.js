@@ -92,32 +92,74 @@ function mb(kb) {
   return `${(kb / 1024).toFixed(1)} MB`;
 }
 
+function setText(id, value) {
+  const node = document.getElementById(id);
+  if (node) node.textContent = value;
+}
+
+function setValue(id, value) {
+  const node = document.getElementById(id);
+  if (node) node.value = value;
+}
+
+function getActiveTab() {
+  return document.querySelector(".tabs button.active")?.dataset.tab || "video";
+}
+
+function getWarningText() {
+  const activeId = getActiveTab() === "warning" ? "warningTextPanel" : "warningText";
+  const activeText = document.getElementById(activeId)?.value || "";
+  const fallbackId = activeId === "warningText" ? "warningTextPanel" : "warningText";
+  const fallbackText = document.getElementById(fallbackId)?.value || "";
+  return (activeText || fallbackText).trim();
+}
+
+function syncWarningTextInputs(value, sourceId) {
+  ["warningText", "warningTextPanel"].forEach((id) => {
+    if (id !== sourceId) setValue(id, value);
+  });
+}
+
+function updateClock() {
+  const now = new Date();
+  const text = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+  setText("clockText", text);
+  setText("deviceIp", window.location.hostname || "127.0.0.1");
+}
+
 async function loadStatus() {
   const data = await api("/api/status");
   const alg = data.algorithm || {};
   const state = document.getElementById("runState");
   state.textContent = alg.running ? "运行中" : "已停止";
   state.className = `status-pill ${alg.running ? "ok" : "bad"}`;
-  document.getElementById("metricState").textContent = alg.running ? "运行中" : "已停止";
-  document.getElementById("metricPid").textContent = alg.pid || "-";
-  document.getElementById("metricRss").textContent = mb(alg.rss_kb);
-  document.getElementById("metricCpu").textContent = alg.cpu_seconds ? `${alg.cpu_seconds}s` : "-";
-  document.getElementById("metricThreads").textContent = alg.threads || "-";
-  document.getElementById("metricUptime").textContent = secondsText(alg.uptime_seconds);
-  document.getElementById("statusDetail").textContent = JSON.stringify(data, null, 2);
+  setText("metricState", alg.running ? "运行中" : "已停止");
+  setText("metricPid", alg.pid || "-");
+  setText("metricRss", mb(alg.rss_kb));
+  setText("metricCpu", alg.cpu_seconds ? `${alg.cpu_seconds}s` : "-");
+  setText("metricThreads", alg.threads || "-");
+  setText("metricUptime", secondsText(alg.uptime_seconds));
+  setText("videoPid", alg.pid || "-");
+  setText("videoRss", mb(alg.rss_kb));
+  setText("videoCpu", alg.cpu_seconds ? `${alg.cpu_seconds}s` : "-");
+  setText("videoThreads", alg.threads || "-");
+  setText("videoUptime", secondsText(alg.uptime_seconds));
+  setText("statusDetail", JSON.stringify(data, null, 2));
   updateVideoInfo(data.video || {});
 }
 
 async function loadMainConfig() {
   mainConfig = await api("/api/main-config");
   renderForm("mainConfigForm", mainFields, mainConfig);
-  document.getElementById("warningText").value = mainConfig.LedWarningText || "";
+  setValue("warningText", mainConfig.LedWarningText || "");
+  setValue("warningTextPanel", mainConfig.LedWarningText || "");
 }
 
 async function loadModelConfig() {
   modelConfig = await api("/api/model-config");
   const values = { ...modelConfig.gie, ...modelConfig.tracker };
   renderForm("modelConfigForm", [...gieFields, ...trackerFields], values);
+  renderModelSummary(values);
 }
 
 async function loadModels() {
@@ -192,6 +234,13 @@ function useSelectedModel() {
   if (input) input.value = selected;
 }
 
+function renderModelSummary(values) {
+  setText("modelCurrent", values.model_engine_file || "-");
+  setText("modelConfidence", values["pre-cluster-threshold"] ?? "-");
+  setText("modelNms", values.nms_iou_threshold ?? "-");
+  setText("modelTrack", values.high_thresh ?? values.low_thresh ?? "-");
+}
+
 async function processAction(action, showToast = true) {
   const data = await api(`/api/process/${action}`, { method: "POST", body: {} });
   await loadStatus();
@@ -220,14 +269,17 @@ async function videoAction(action) {
 
 function updateVideoInfo(video) {
   const stream = video.webrtc || "-";
-  document.getElementById("sourcePath").textContent = video.source || "-";
-  document.getElementById("streamPath").textContent = stream;
+  setText("sourcePath", video.source || "-");
+  setText("streamPath", stream);
   const mediaState = video.installed
     ? `${video.running ? "MediaMTX运行中" : "MediaMTX未运行"}，${video.relay_running ? "转推运行中" : "转推未运行"}，WebRTC:${video.webrtc_port || "-"}，RTSP:${video.rtsp_port || "-"}`
     : "未找到 mediamtx";
-  document.getElementById("mediaState").textContent = mediaState;
+  setText("mediaState", mediaState);
+  setText("videoMedia", video.running ? "运行中" : "未运行");
+  setText("videoRelay", video.relay_running ? "运行中" : "未运行");
   const hint = document.getElementById("videoHint");
   const frame = document.getElementById("videoPlayer");
+  if (!hint || !frame) return;
   if (video.webrtc && video.running) {
     hint.textContent = "带框 RTSP 正在通过 MediaMTX WebRTC 显示";
     hint.style.display = "none";
@@ -248,11 +300,12 @@ function refreshVideo() {
 }
 
 function setWarningText(text) {
-  document.getElementById("warningText").value = text;
+  setValue("warningText", text);
+  setValue("warningTextPanel", text);
 }
 
 async function publishWarning(restart) {
-  const text = document.getElementById("warningText").value.trim();
+  const text = getWarningText();
   const data = await api("/api/warning/publish", { method: "POST", body: { text, restart } });
   renderWarnings(data.history || []);
   if (restart) await loadStatus();
@@ -261,7 +314,27 @@ async function publishWarning(restart) {
 
 function renderWarnings(rows) {
   const body = document.getElementById("warningHistory");
-  body.innerHTML = rows.map((row) => `<tr><td>${escapeHtml(row.time)}</td><td>${escapeHtml(row.text)}</td><td>${escapeHtml(row.result)}</td></tr>`).join("");
+  if (body) {
+    body.innerHTML = rows.map((row) => `<tr><td>${escapeHtml(row.time)}</td><td>${escapeHtml(row.text)}</td><td>${escapeHtml(row.result)}</td></tr>`).join("");
+  }
+  renderEventFeed(rows || []);
+}
+
+function renderEventFeed(rows) {
+  const feed = document.getElementById("eventFeed");
+  if (!feed) return;
+  const source = rows.length ? rows.slice(0, 5) : [
+    { time: "--:--:--", text: "暂无预警事件", result: "等待发布" }
+  ];
+  feed.innerHTML = source.map((row, index) => {
+    const level = index % 3 === 0 ? "high" : index % 3 === 1 ? "mid" : "low";
+    const label = level === "high" ? "高" : level === "mid" ? "中" : "低";
+    return `<div class="event-item">
+      <div class="event-level ${level}">${label}</div>
+      <div><strong>${escapeHtml(row.text || "-")}</strong><span>${escapeHtml(row.result || "-")}</span></div>
+      <time>${escapeHtml(row.time || "-")}</time>
+    </div>`;
+  }).join("");
 }
 
 function escapeHtml(value) {
@@ -272,5 +345,10 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;");
 }
 
+updateClock();
+document.querySelectorAll("#warningText, #warningTextPanel").forEach((node) => {
+  node.addEventListener("input", () => syncWarningTextInputs(node.value, node.id));
+});
 loadAll().catch((error) => toast(error.message));
+setInterval(updateClock, 1000);
 setInterval(() => loadStatus().catch(() => {}), 5000);

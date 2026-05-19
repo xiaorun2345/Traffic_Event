@@ -137,6 +137,10 @@ export LD_LIBRARY_PATH=../lib:$LD_LIBRARY_PATH
 http://设备IP:8080
 ```
 
+前端界面采用深色科技感布局，默认进入“视频监控”页面，中心显示带框实时画面，右侧集中展示预警事件、模型阈值和预警发布，底部展示算法进程和 MediaMTX 转推状态。界面参考图：
+
+![Traffic Event 平台前端设计图](traffic_platform_frontend_design.png)
+
 启动平台：
 
 ```bash

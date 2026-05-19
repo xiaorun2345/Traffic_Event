@@ -7,131 +7,269 @@
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <header class="topbar">
-      <div>
-        <h1>Traffic Event 管理平台</h1>
-        <p>配置、模型、视频、预警与运行监控</p>
-      </div>
-      <div class="status-pill" id="runState">读取中</div>
-    </header>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">TE</div>
+          <div>
+            <h1>Traffic Event</h1>
+            <p>智慧交通事件平台</p>
+          </div>
+        </div>
+        <nav class="tabs">
+          <button data-tab="dashboard"><span>⌂</span>首页监控</button>
+          <button data-tab="config"><span>⚙</span>配置管理</button>
+          <button data-tab="model"><span>◇</span>模型管理</button>
+          <button data-tab="video" class="active"><span>▣</span>视频监控</button>
+          <button data-tab="warning"><span>!</span>预警发布</button>
+          <button data-tab="logs"><span>≡</span>系统维护</button>
+        </nav>
+        <div class="sidebar-foot">
+          <span></span>
+          <small>LAN 控制台</small>
+        </div>
+      </aside>
 
-    <nav class="tabs">
-      <button data-tab="dashboard" class="active">首页监控</button>
-      <button data-tab="config">配置管理</button>
-      <button data-tab="model">模型管理</button>
-      <button data-tab="video">视频监控</button>
-      <button data-tab="warning">预警发布</button>
-      <button data-tab="logs">维护</button>
-    </nav>
+      <div class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">实时运行监控</p>
+            <h2>Traffic Event 管理平台</h2>
+          </div>
+          <div class="top-status">
+            <div class="status-pill" id="runState">读取中</div>
+            <div class="top-chip"><span id="clockText">--:--:--</span></div>
+            <div class="top-chip"><span id="deviceIp">127.0.0.1</span></div>
+            <div class="top-chip ok"><span>系统正常</span></div>
+          </div>
+        </header>
 
-    <main>
-      <section id="dashboard" class="panel active">
-        <div class="grid metrics">
-          <article>
-            <span>算法状态</span>
-            <strong id="metricState">-</strong>
-          </article>
-          <article>
-            <span>PID</span>
-            <strong id="metricPid">-</strong>
-          </article>
-          <article>
-            <span>RSS 内存</span>
-            <strong id="metricRss">-</strong>
-          </article>
-          <article>
-            <span>CPU 时间</span>
-            <strong id="metricCpu">-</strong>
-          </article>
-          <article>
-            <span>线程数</span>
-            <strong id="metricThreads">-</strong>
-          </article>
-          <article>
-            <span>运行时长</span>
-            <strong id="metricUptime">-</strong>
-          </article>
-        </div>
-        <div class="actions">
-          <button onclick="processAction('start')">启动算法</button>
-          <button onclick="processAction('stop')">停止算法</button>
-          <button onclick="processAction('restart')" class="danger">重启算法</button>
-          <button onclick="loadAll()">刷新</button>
-        </div>
-        <pre id="statusDetail" class="logbox"></pre>
-      </section>
+        <main>
+          <section id="dashboard" class="panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Overview</p>
+                <h3>首页监控</h3>
+              </div>
+              <button onclick="loadAll()">刷新</button>
+            </div>
+            <div class="metrics dashboard-grid">
+              <article>
+                <span>算法状态</span>
+                <strong id="metricState">-</strong>
+                <div class="spark blue"></div>
+              </article>
+              <article>
+                <span>PID</span>
+                <strong id="metricPid">-</strong>
+                <div class="spark cyan"></div>
+              </article>
+              <article>
+                <span>RSS 内存</span>
+                <strong id="metricRss">-</strong>
+                <div class="spark green"></div>
+              </article>
+              <article>
+                <span>CPU 时间</span>
+                <strong id="metricCpu">-</strong>
+                <div class="spark amber"></div>
+              </article>
+              <article>
+                <span>线程数</span>
+                <strong id="metricThreads">-</strong>
+                <div class="spark violet"></div>
+              </article>
+              <article>
+                <span>运行时长</span>
+                <strong id="metricUptime">-</strong>
+                <div class="spark blue"></div>
+              </article>
+            </div>
+            <div class="actions">
+              <button onclick="processAction('start')" class="primary">启动算法</button>
+              <button onclick="processAction('stop')" class="danger">停止算法</button>
+              <button onclick="processAction('restart')">重启算法</button>
+            </div>
+            <pre id="statusDetail" class="logbox"></pre>
+          </section>
 
-      <section id="config" class="panel">
-        <form id="mainConfigForm" class="form-grid"></form>
-        <div class="actions">
-          <button onclick="saveMainConfig(false)">保存配置</button>
-          <button onclick="saveMainConfig(true)" class="danger">保存并重启算法</button>
-        </div>
-      </section>
+          <section id="config" class="panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Runtime Config</p>
+                <h3>配置管理</h3>
+              </div>
+              <div class="actions compact">
+                <button onclick="saveMainConfig(false)" class="primary">保存配置</button>
+                <button onclick="saveMainConfig(true)" class="danger">保存并重启算法</button>
+              </div>
+            </div>
+            <form id="mainConfigForm" class="form-grid"></form>
+          </section>
 
-      <section id="model" class="panel">
-        <div class="toolbar">
-          <label>模型预设</label>
-          <select id="profileSelect"></select>
-          <button onclick="applyProfile()">应用预设</button>
-        </div>
-        <div class="toolbar">
-          <label>模型文件</label>
-          <select id="modelSelect"></select>
-          <button onclick="useSelectedModel()">使用该模型</button>
-        </div>
-        <form id="modelConfigForm" class="form-grid"></form>
-        <div class="actions">
-          <button onclick="saveModelConfig(false)">保存模型参数</button>
-          <button onclick="saveModelConfig(true)" class="danger">保存并重启算法</button>
-        </div>
-      </section>
+          <section id="model" class="panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Model Profile</p>
+                <h3>模型管理</h3>
+              </div>
+              <div class="actions compact">
+                <button onclick="saveModelConfig(false)" class="primary">保存模型参数</button>
+                <button onclick="saveModelConfig(true)" class="danger">保存并重启算法</button>
+              </div>
+            </div>
+            <div class="toolbar">
+              <label>模型预设<select id="profileSelect"></select></label>
+              <button onclick="applyProfile()">应用预设</button>
+              <label>模型文件<select id="modelSelect"></select></label>
+              <button onclick="useSelectedModel()">使用该模型</button>
+            </div>
+            <form id="modelConfigForm" class="form-grid"></form>
+          </section>
 
-      <section id="video" class="panel">
-        <div class="video-wrap">
-          <iframe id="videoPlayer" title="带框 RTSP WebRTC 画面" allow="autoplay; fullscreen"></iframe>
-          <div class="video-placeholder" id="videoHint">点击“启动 WebRTC 转发”显示带框 RTSP 实时画面</div>
-        </div>
-        <div class="actions">
-          <button onclick="videoAction('start')">启动 WebRTC 转发</button>
-          <button onclick="videoAction('stop')">停止 WebRTC 转发</button>
-          <button onclick="refreshVideo()">刷新画面</button>
-        </div>
-        <p class="muted">源流地址：<code id="sourcePath">-</code></p>
-        <p class="muted">WebRTC 播放地址：<code id="streamPath">-</code></p>
-        <p class="muted">MediaMTX 状态：<code id="mediaState">-</code></p>
-      </section>
+          <section id="video" class="panel active video-console">
+            <div class="video-grid">
+              <div class="video-main">
+                <div class="video-wrap">
+                  <iframe id="videoPlayer" title="带框 RTSP WebRTC 画面" allow="autoplay; fullscreen"></iframe>
+                  <div class="stream-badge"><span></span>WebRTC Live / RTSP: 8555 / 25FPS</div>
+                  <div class="video-placeholder" id="videoHint">点击“启动 WebRTC 转发”显示带框 RTSP 实时画面</div>
+                </div>
+                <div class="actions video-actions">
+                  <button onclick="processAction('start')" class="primary">▷ 启动算法</button>
+                  <button onclick="processAction('stop')" class="danger">□ 停止算法</button>
+                  <button onclick="videoAction('start')" class="primary alt">◉ 启动 WebRTC 转发</button>
+                  <button onclick="refreshVideo()">↻ 刷新画面</button>
+                </div>
+                <div class="stream-info">
+                  <p>源流：<code id="sourcePath">-</code></p>
+                  <p>播放：<code id="streamPath">-</code></p>
+                  <p>状态：<code id="mediaState">-</code></p>
+                </div>
+              </div>
 
-      <section id="warning" class="panel">
-        <label class="full">
-          预警文字
-          <textarea id="warningText" rows="4"></textarea>
-        </label>
-        <div class="quick">
-          <button onclick="setWarningText('您已超速，请减速慢行')">超速预警</button>
-          <button onclick="setWarningText('前方行人，请注意避让')">行人预警</button>
-          <button onclick="setWarningText('前方施工，请减速慢行')">施工预警</button>
-          <button onclick="setWarningText('前方有非机动车，请注意安全')">非机动车预警</button>
-        </div>
-        <div class="actions">
-          <button onclick="publishWarning(false)">保存预警文字</button>
-          <button onclick="publishWarning(true)" class="danger">保存并重启算法</button>
-        </div>
-        <table>
-          <thead><tr><th>时间</th><th>内容</th><th>结果</th></tr></thead>
-          <tbody id="warningHistory"></tbody>
-        </table>
-      </section>
+              <aside class="right-rail">
+                <section class="rail-panel">
+                  <div class="rail-title">
+                    <h4>预警事件</h4>
+                    <span>实时</span>
+                  </div>
+                  <div class="event-feed" id="eventFeed"></div>
+                </section>
 
-      <section id="logs" class="panel">
-        <h2>部署说明</h2>
-        <pre class="logbox">平台服务：traffic_platform/backend/app.py
+                <section class="rail-panel">
+                  <div class="rail-title">
+                    <h4>模型参数</h4>
+                    <span>Config</span>
+                  </div>
+                  <div class="param-list">
+                    <div><span>当前模型</span><strong id="modelCurrent">-</strong></div>
+                    <div><span>置信度阈值</span><strong id="modelConfidence">-</strong></div>
+                    <div><span>NMS 阈值</span><strong id="modelNms">-</strong></div>
+                    <div><span>跟踪阈值</span><strong id="modelTrack">-</strong></div>
+                  </div>
+                </section>
+
+                <section class="rail-panel">
+                  <div class="rail-title">
+                    <h4>发布预警</h4>
+                    <span>LED</span>
+                  </div>
+                  <label class="full">
+                    <textarea id="warningText" rows="4" placeholder="请输入预警内容..."></textarea>
+                  </label>
+                  <div class="quick">
+                    <button onclick="setWarningText('您已超速，请减速慢行')">超速</button>
+                    <button onclick="setWarningText('前方行人，请注意避让')">行人</button>
+                    <button onclick="setWarningText('前方施工，请减速慢行')">施工</button>
+                  </div>
+                  <button onclick="publishWarning(false)" class="primary wide">发布预警</button>
+                </section>
+              </aside>
+            </div>
+
+            <div class="metrics bottom-metrics">
+              <article>
+                <span>CPU 时间</span>
+                <strong id="videoCpu">-</strong>
+                <div class="spark blue"></div>
+              </article>
+              <article>
+                <span>RSS 内存</span>
+                <strong id="videoRss">-</strong>
+                <div class="spark cyan"></div>
+              </article>
+              <article>
+                <span>线程数</span>
+                <strong id="videoThreads">-</strong>
+                <div class="spark green"></div>
+              </article>
+              <article>
+                <span>运行时长</span>
+                <strong id="videoUptime">-</strong>
+                <div class="spark amber"></div>
+              </article>
+              <article>
+                <span>算法 PID</span>
+                <strong id="videoPid">-</strong>
+                <div class="spark violet"></div>
+              </article>
+              <article>
+                <span>MediaMTX 状态</span>
+                <strong id="videoMedia">-</strong>
+                <div class="spark green"></div>
+              </article>
+              <article>
+                <span>FFmpeg 转推</span>
+                <strong id="videoRelay">-</strong>
+                <div class="spark green"></div>
+              </article>
+            </div>
+          </section>
+
+          <section id="warning" class="panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Warning Publish</p>
+                <h3>预警发布</h3>
+              </div>
+              <div class="actions compact">
+                <button onclick="publishWarning(false)" class="primary">保存预警文字</button>
+                <button onclick="publishWarning(true)" class="danger">保存并重启算法</button>
+              </div>
+            </div>
+            <label class="full">
+              预警文字
+              <textarea id="warningTextPanel" rows="4"></textarea>
+            </label>
+            <div class="quick">
+              <button onclick="setWarningText('您已超速，请减速慢行')">超速预警</button>
+              <button onclick="setWarningText('前方行人，请注意避让')">行人预警</button>
+              <button onclick="setWarningText('前方施工，请减速慢行')">施工预警</button>
+              <button onclick="setWarningText('前方有非机动车，请注意安全')">非机动车预警</button>
+            </div>
+            <table>
+              <thead><tr><th>时间</th><th>内容</th><th>结果</th></tr></thead>
+              <tbody id="warningHistory"></tbody>
+            </table>
+          </section>
+
+          <section id="logs" class="panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Maintenance</p>
+                <h3>系统维护</h3>
+              </div>
+            </div>
+            <pre class="logbox">平台服务：traffic_platform/backend/app.py
 默认端口：8080
 局域网访问：http://设备IP:8080
 视频显示：算法带框 RTSP -> FFmpeg copy 转推 -> MediaMTX -> WebRTC
 配置备份：traffic_platform/runtime/backups/</pre>
-      </section>
-    </main>
+          </section>
+        </main>
+      </div>
+    </div>
 
     <div id="toast"></div>
     <script src="/app.js"></script>
