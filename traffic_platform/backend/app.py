@@ -368,7 +368,16 @@ def find_algorithm_pid():
 
 
 def process_exists(pid):
-    return pid and Path(f"/proc/{pid}").exists()
+    if not pid:
+        return False
+    proc = Path(f"/proc/{pid}")
+    if not proc.exists():
+        return False
+    try:
+        status = (proc / "status").read_text()
+        return not re.search(r"^State:\s+Z\b", status, re.MULTILINE)
+    except Exception:
+        return True
 
 
 def read_proc_stats(pid):

@@ -29,6 +29,7 @@ compile_commands.json
 core
 core.*
 traffic_platform/backend/__pycache__/
+traffic_platform/runtime/*.pid
 traffic_platform/runtime/logs/
 traffic_platform/runtime/hls/
 traffic_platform/runtime/backups/
