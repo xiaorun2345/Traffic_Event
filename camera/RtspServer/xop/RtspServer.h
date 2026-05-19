@@ -26,6 +26,7 @@ public:
     void RemoveSession(MediaSessionId sessionId);
 
     bool PushFrame(MediaSessionId sessionId, MediaChannelId channelId, AVFrame frame);
+    uint32_t GetSessionClientCount(MediaSessionId sessionId);
 
 private:
     friend class RtspConnection;
@@ -43,4 +44,3 @@ private:
 }
 
 #endif
-

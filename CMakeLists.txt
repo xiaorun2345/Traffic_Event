@@ -82,6 +82,9 @@ include_directories(
 	${DECODER_PATH}/rk3588/mpp/include
 	${CMAKE_CURRENT_SOURCE_DIR}/ffmedia_release/
 	${CMAKE_CURRENT_SOURCE_DIR}/ffmedia_release/include
+	${CAMERA_PATH}
+	${CAMERA_PATH}/RtspServer
+	${CAMERA_PATH}/RtspServer/3rdpart
 )
 
 link_directories( 
@@ -97,11 +100,14 @@ link_directories(
 )
 
 
+file(GLOB_RECURSE RTSP_SERVER_SRCS ${CAMERA_PATH}/RtspServer/*.cpp)
+
 set(SOURCES_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/DealRCF.cpp
 				  ${CMAKE_CURRENT_SOURCE_DIR}/src/LedScreen.cpp
 				  #${CMAKE_CURRENT_SOURCE_DIR}/src/SerialPortCommunication.cpp
 				  ${CMAKE_CURRENT_SOURCE_DIR}/common/nebulalink.perceptron3.0.5.pb.cc
-				  ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp)
+				  ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
+				  ${RTSP_SERVER_SRCS})
 
 
 

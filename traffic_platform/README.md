@@ -14,6 +14,7 @@ http://设备IP:8080
 - 启动、停止、重启 `output/cw_DealRCF_nebulalink`。
 - 监控算法进程 PID、RSS 内存、VMS、线程数、CPU 时间、运行时长。
 - 通过 `ffmpeg` 将配置中的 RTSP/视频源转为 HLS，页面访问 `/hls/live.m3u8`。
+- 当 `CameraShow = 4` 时，算法会在本机 `8554` 端口推送硬件编码后的带框 RTSP 流，平台会优先转这一路带框流。
 - 保存预警文字，可选择保存后重启算法。
 
 ## 启动
@@ -44,6 +45,7 @@ traffic_platform/
 
 ## 注意
 
+- 带框视频流地址格式为 `rtsp://设备IP:8554/摄像头IP/camera`。平台本机转 HLS 时使用 `rtsp://127.0.0.1:8554/摄像头IP/camera`。
 - 浏览器不一定原生支持 HLS。如果页面不能直接播放，可用 VLC 打开：
 
 ```text

@@ -97,8 +97,18 @@ bool RtspServer::PushFrame(MediaSessionId session_id, MediaChannelId channel_id,
     return false;
 }
 
+uint32_t RtspServer::GetSessionClientCount(MediaSessionId session_id)
+{
+    std::lock_guard<std::mutex> locker(mutex_);
+    auto iter = media_sessions_.find(session_id);
+    if (iter == media_sessions_.end() || iter->second == nullptr) {
+        return 0;
+    }
+
+    return iter->second->GetNumClient();
+}
+
 TcpConnection::Ptr RtspServer::OnConnect(SOCKET sockfd)
 {	
 	return std::make_shared<RtspConnection>(shared_from_this(), event_loop_->GetTaskScheduler().get(), sockfd);
 }
-

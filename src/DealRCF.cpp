@@ -1,11 +1,18 @@
 #include "DealRCF.h"
 #include <ctime>
+#include <algorithm>
+#include <cctype>
+#include <cstdint>
+#include <cstring>
+#include <memory>
+#include <sstream>
+#include <vector>
 
-// #include "../camera/detector/MppEncoder.h"
+#include "../camera/detector/MppEncoder.h"
 // #include "../camera/detector/MppDecoder.h"
 #include <mutex>
-//#include "../RtspServer/xop/RtspServer.h"
-//#include "../RtspServer/net/Timer.h"
+#include "../camera/RtspServer/xop/RtspServer.h"
+#include "../camera/RtspServer/net/EventLoop.h"
 
 // std::mutex g_frame_mutex;
 // cv::Mat g_yuvImg;
@@ -69,6 +76,140 @@ static RTSP_STREAM_TYPE ParseRtspTransport(const std::string& transport)
 		return RTSP_STREAM_TYPE_MULTICAST;
 
 	return RTSP_STREAM_TYPE_TCP;
+}
+
+namespace
+{
+constexpr int kPushRtspPort = 8554;
+constexpr int kPushRtspFps = 25;
+
+std::string ExtractRtspStreamName(const std::string& uri)
+{
+	std::string name = uri;
+	std::string::size_type start = 0;
+	if (name.compare(0, 7, "rtsp://") == 0)
+		start = 7;
+
+	std::string::size_type at = name.find('@', start);
+	if (at != std::string::npos)
+		start = at + 1;
+
+	name = name.substr(start);
+	std::string::size_type slash = name.find('/');
+	if (slash != std::string::npos)
+		name = name.substr(0, slash);
+
+	std::string::size_type colon = name.find(':');
+	if (colon != std::string::npos)
+		name = name.substr(0, colon);
+
+	if (name.empty())
+		name = "camera";
+
+	for (char& ch : name)
+	{
+		if (!(std::isalnum(static_cast<unsigned char>(ch)) || ch == '.' || ch == '_' || ch == '-'))
+			ch = '_';
+	}
+	return name;
+}
+
+class HardwareRtspStreamer
+{
+public:
+	bool Start(const std::string& suffix, int width, int height)
+	{
+		if (started_)
+			return true;
+
+		width_ = width;
+		height_ = height;
+		if (width_ <= 0 || height_ <= 0)
+		{
+			std::cout << "RTSP push invalid frame size: " << width_ << "x" << height_ << std::endl;
+			return false;
+		}
+
+		event_loop_.reset(new xop::EventLoop());
+		server_ = xop::RtspServer::Create(event_loop_.get());
+		if (!server_->Start("0.0.0.0", kPushRtspPort))
+		{
+			std::cout << "RTSP push server listen on " << kPushRtspPort << " failed." << std::endl;
+			server_.reset();
+			event_loop_.reset();
+			return false;
+		}
+
+		xop::MediaSession* session = xop::MediaSession::CreateNew(suffix);
+		session->AddSource(xop::channel_0, xop::H264Source::CreateNew(kPushRtspFps));
+		session->AddNotifyConnectedCallback([](xop::MediaSessionId, std::string peer_ip, uint16_t peer_port) {
+			std::cout << "RTSP push client connect, ip=" << peer_ip << ", port=" << peer_port << std::endl;
+		});
+		session->AddNotifyDisconnectedCallback([](xop::MediaSessionId, std::string peer_ip, uint16_t peer_port) {
+			std::cout << "RTSP push client disconnect, ip=" << peer_ip << ", port=" << peer_port << std::endl;
+		});
+
+		session_id_ = server_->AddSession(session);
+		if (session_id_ == 0)
+		{
+			std::cout << "RTSP push add session failed: " << suffix << std::endl;
+			server_.reset();
+			event_loop_.reset();
+			return false;
+		}
+
+		encoder_.reset(new whale::vision::MppEncoder());
+		encoder_->MppEncdoerInit(width_, height_, kPushRtspFps);
+		encoded_.resize(static_cast<size_t>(width_) * static_cast<size_t>(height_) * 3);
+		yuv_size_ = width_ * height_ * 3 / 2;
+		suffix_ = suffix;
+		started_ = true;
+		std::cout << "RTSP push stream ready: rtsp://127.0.0.1:" << kPushRtspPort
+		          << "/" << suffix_ << std::endl;
+		return true;
+	}
+
+	bool Push(const cv::Mat& bgr)
+	{
+		if (!started_ || bgr.empty())
+			return false;
+
+		if (server_->GetSessionClientCount(session_id_) == 0)
+			return true;
+
+		cv::Mat frame = bgr;
+		if (frame.cols != width_ || frame.rows != height_)
+			cv::resize(frame, frame, cv::Size(width_, height_));
+
+		cv::Mat yuv;
+		cv::cvtColor(frame, yuv, cv::COLOR_BGR2YUV_I420);
+		if (!yuv.isContinuous())
+			yuv = yuv.clone();
+
+		int length = 0;
+		if (encoder_->encode(yuv.data, yuv_size_, encoded_.data(), &length) != MPP_OK || length <= 0)
+			return false;
+
+		xop::AVFrame video_frame(length);
+		video_frame.type = 0;
+		video_frame.size = static_cast<uint32_t>(length);
+		video_frame.timestamp = xop::H264Source::GetTimestamp();
+		memcpy(video_frame.buffer.get(), encoded_.data(), static_cast<size_t>(length));
+		return server_->PushFrame(session_id_, xop::channel_0, video_frame);
+	}
+
+private:
+	bool started_ = false;
+	int width_ = 0;
+	int height_ = 0;
+	int yuv_size_ = 0;
+	std::string suffix_;
+	std::unique_ptr<xop::EventLoop> event_loop_;
+	std::shared_ptr<xop::RtspServer> server_;
+	xop::MediaSessionId session_id_ = 0;
+	std::unique_ptr<whale::vision::MppEncoder> encoder_;
+	std::vector<char> encoded_;
+};
 }
 
 
@@ -320,10 +461,13 @@ void *DealRCF::CameraDealThread(void *arg)
 	//是否显示视频框: 单视觉模式，显示等于1
 	bool is_show = (SEND_SENSOR_CAMERA == DealRCF::deal_info_.SendSensorType) && (1==DealRCF::deal_info_.CameraShow);
 
-    //保存结果视频or推流（二选一）
+    //保存结果视频或推带框 RTSP 流
 	cv::VideoWriter writer;
     bool is_push_rtsp = (4 == DealRCF::deal_info_.CameraShow) && (SEND_SENSOR_CAMERA == DealRCF::deal_info_.SendSensorType);
-	bool is_save = ((SAVE_CAMERA_RESULT_VIDEO == DealRCF::deal_info_.IsSaveData) || is_push_rtsp);
+	bool is_save = (SAVE_CAMERA_RESULT_VIDEO == DealRCF::deal_info_.IsSaveData);
+	HardwareRtspStreamer rtsp_streamer;
+	bool rtsp_streamer_started = false;
+	std::string rtsp_suffix;
 	// std::cout << "********is_push_rtsp: " << is_push_rtsp << std::endl;
 	if(is_save)
 	{
@@ -352,26 +496,17 @@ void *DealRCF::CameraDealThread(void *arg)
 
             std::cout << "video_name: " << file_name << std::endl;
         }
-        
-        if(is_push_rtsp) //如果推流
-        {
-            std::string temp = "rtsp://127.0.0.1:8554/" + file_name + "/camera";
-            std::cout << "!!!!!!!!!!push live stream uri: " << temp << std::endl;
-            pipeline = "appsrc is-live=true ! video/x-raw, format=BGR ! videoconvert ! queue ! nvvidconv ! nvv4l2h265enc ! h265parse ! rtspclientsink location=" + temp;    
-        }
-        else //保存结果视频
-        {
-			std::time_t currentTime = std::time(nullptr);
-			// 将时间转换为本地时间
-    		std::tm* localTime = std::localtime(&currentTime);
-			// 格式化时间为字符串
-    		char formattedTime[100];
-    		std::strftime(formattedTime, sizeof(formattedTime), "%Y%m%d%H%M%S", localTime);
-            std::string temp = "result_camera_" + file_name + "_" + std::string(formattedTime) + ".mkv";
-            // pipeline="appsrc ! video/x-raw, format=BGR ! timeoverlay ！videoconvert ! queue ! nvvidconv ! nvv4l2h265enc ! h265parse ! matroskamux ! filesink location="+temp;
-            // pipeline="appsrc ! video/x-raw, format=BGR ! videoconvert ! queue ! nvvidconv ! nvv4l2h265enc ! h265parse ! mp4mux ! filesink location=camera_result.mp4";
-			pipeline = "appsrc is-live=true ! video/x-raw,format=BGR ! timeoverlay ! videoconvert ! queue ! nvvidconv ! nvv4l2h265enc ! h265parse ! matroskamux ! filesink location="+temp;
-		}
+
+		std::time_t currentTime = std::time(nullptr);
+		// 将时间转换为本地时间
+		std::tm* localTime = std::localtime(&currentTime);
+		// 格式化时间为字符串
+		char formattedTime[100];
+		std::strftime(formattedTime, sizeof(formattedTime), "%Y%m%d%H%M%S", localTime);
+        std::string temp = "result_camera_" + file_name + "_" + std::string(formattedTime) + ".mkv";
+        // pipeline="appsrc ! video/x-raw, format=BGR ! timeoverlay ！videoconvert ! queue ! nvvidconv ! nvv4l2h265enc ! h265parse ! matroskamux ! filesink location="+temp;
+        // pipeline="appsrc ! video/x-raw, format=BGR ! videoconvert ! queue ! nvvidconv ! nvv4l2h265enc ! h265parse ! mp4mux ! filesink location=camera_result.mp4";
+		pipeline = "appsrc is-live=true ! video/x-raw,format=BGR ! timeoverlay ! videoconvert ! queue ! nvvidconv ! nvv4l2h265enc ! h265parse ! matroskamux ! filesink location="+temp;
 
 		writer.open(pipeline, cv::CAP_GSTREAMER, cv::VideoWriter::fourcc('h', '2', '6', '5'), 25, cv::Size(DealRCF::deal_info_.CameraLength, DealRCF::deal_info_.CameraWidth), true);
  		if(!writer.isOpened())
@@ -379,6 +514,11 @@ void *DealRCF::CameraDealThread(void *arg)
 			std::cout << "writer video open error in camera thread...\n";
 			is_save = false;
 		}
+	}
+	if(is_push_rtsp)
+	{
+		rtsp_suffix = ExtractRtspStreamName(DealRCF::deal_info_.CameraURI) + "/camera";
+		std::cout << "push live stream uri: rtsp://127.0.0.1:8554/" << rtsp_suffix << std::endl;
 	}
 
 	while (true)
@@ -417,6 +557,13 @@ void *DealRCF::CameraDealThread(void *arg)
 		// printf("[CAMERA] camera deal time: %ld\n", time2-time1);
 
 		camera_app.DrawResult(img, &objects);
+		if(is_push_rtsp)
+		{
+			if(!rtsp_streamer_started)
+				rtsp_streamer_started = rtsp_streamer.Start(rtsp_suffix, img.cols, img.rows);
+			if(rtsp_streamer_started)
+				rtsp_streamer.Push(img);
+		}
 		if(is_save)
 			writer << img;
 		

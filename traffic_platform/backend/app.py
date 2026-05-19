@@ -471,10 +471,31 @@ def video_pid():
     return pid if process_exists(pid) else None
 
 
+def push_rtsp_suffix(camera_uri):
+    parsed = urlparse(camera_uri)
+    if parsed.scheme == "rtsp" and parsed.hostname:
+        name = parsed.hostname
+    else:
+        name = Path(camera_uri).stem or "camera"
+    name = re.sub(r"[^A-Za-z0-9._-]+", "_", name)
+    return f"{name}/camera"
+
+
+def configured_video_source(config):
+    source = str(config.get("CameraURI", "")).strip()
+    try:
+        camera_show = int(config.get("CameraShow", 0))
+    except (TypeError, ValueError):
+        camera_show = 0
+    if camera_show == 4 and source:
+        return f"rtsp://127.0.0.1:8554/{push_rtsp_suffix(source)}"
+    return source
+
+
 def video_status():
     pid = video_pid()
     config = read_main_config()
-    source = str(config.get("CameraURI", "")).strip()
+    source = configured_video_source(config)
     return {
         "running": bool(pid),
         "pid": pid,
@@ -488,7 +509,7 @@ def start_video():
     if pid:
         return {"started": False, **video_status()}
     config = read_main_config()
-    source = str(config.get("CameraURI", "")).strip()
+    source = configured_video_source(config)
     if not source:
         raise ValueError("CameraURI is empty")
     for item in HLS_ROOT.glob("*"):
