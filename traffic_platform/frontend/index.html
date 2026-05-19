@@ -89,16 +89,17 @@
 
       <section id="video" class="panel">
         <div class="video-wrap">
-          <video id="videoPlayer" controls muted playsinline></video>
-          <div class="video-placeholder" id="videoHint">点击“启动视频流”生成 /hls/live.m3u8</div>
+          <iframe id="videoPlayer" title="带框 RTSP WebRTC 画面" allow="autoplay; fullscreen"></iframe>
+          <div class="video-placeholder" id="videoHint">点击“启动 WebRTC 转发”显示带框 RTSP 实时画面</div>
         </div>
         <div class="actions">
-          <button onclick="videoAction('start')">启动视频流</button>
-          <button onclick="videoAction('stop')">停止视频流</button>
-          <button onclick="refreshVideo()">刷新播放器</button>
+          <button onclick="videoAction('start')">启动 WebRTC 转发</button>
+          <button onclick="videoAction('stop')">停止 WebRTC 转发</button>
+          <button onclick="refreshVideo()">刷新画面</button>
         </div>
         <p class="muted">源流地址：<code id="sourcePath">-</code></p>
-        <p class="muted">播放地址：<code id="playlistPath">-</code></p>
+        <p class="muted">WebRTC 播放地址：<code id="streamPath">-</code></p>
+        <p class="muted">MediaMTX 状态：<code id="mediaState">-</code></p>
       </section>
 
       <section id="warning" class="panel">
@@ -127,7 +128,7 @@
         <pre class="logbox">平台服务：traffic_platform/backend/app.py
 默认端口：8080
 局域网访问：http://设备IP:8080
-HLS 输出：traffic_platform/runtime/hls/live.m3u8
+视频显示：算法带框 RTSP -> MediaMTX -> WebRTC
 配置备份：traffic_platform/runtime/backups/</pre>
       </section>
     </main>

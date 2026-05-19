@@ -30,9 +30,11 @@ core
 core.*
 traffic_platform/backend/__pycache__/
 traffic_platform/runtime/*.pid
+traffic_platform/runtime/mediamtx.yml
 traffic_platform/runtime/logs/
 traffic_platform/runtime/hls/
 traffic_platform/runtime/backups/
+traffic_platform/mediamtx/mediamtx
 
 # 视频、发布包和超大产物
 *.deb

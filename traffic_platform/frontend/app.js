@@ -200,28 +200,51 @@ async function processAction(action, showToast = true) {
 
 async function videoAction(action) {
   const data = await api(`/api/video/${action}`, { method: "POST", body: {} });
-  updateVideoInfo(data);
-  if (action === "start") setTimeout(refreshVideo, 1500);
-  toast(action === "start" ? "视频流已启动" : "视频流已停止");
+  if (action === "stop") {
+    await loadStatus();
+  } else {
+    updateVideoInfo(data);
+  }
+  if (action === "start") {
+    refreshVideo();
+    toast("WebRTC 转发已启动");
+  } else {
+    const frame = document.getElementById("videoPlayer");
+    frame.removeAttribute("src");
+    const hint = document.getElementById("videoHint");
+    hint.textContent = "已停止显示";
+    hint.style.display = "grid";
+    toast("WebRTC 转发已停止");
+  }
 }
 
 function updateVideoInfo(video) {
-  const playlist = video.playlist || "-";
+  const stream = video.webrtc || "-";
   document.getElementById("sourcePath").textContent = video.source || "-";
-  document.getElementById("playlistPath").textContent = playlist;
-  if (video.playlist) {
-    document.getElementById("videoHint").textContent = "如果浏览器不支持 HLS，可用 VLC 打开该地址";
+  document.getElementById("streamPath").textContent = stream;
+  const mediaState = video.installed
+    ? `${video.running ? "运行中" : "未运行"}，WebRTC:${video.webrtc_port || "-"}，RTSP:${video.rtsp_port || "-"}`
+    : "未找到 mediamtx";
+  document.getElementById("mediaState").textContent = mediaState;
+  const hint = document.getElementById("videoHint");
+  const frame = document.getElementById("videoPlayer");
+  if (video.webrtc && video.running) {
+    hint.textContent = "带框 RTSP 正在通过 MediaMTX WebRTC 显示";
+    hint.style.display = "none";
+    if (!frame.getAttribute("src")) frame.src = `${video.webrtc}?t=${Date.now()}`;
   } else if (video.source) {
-    document.getElementById("videoHint").textContent = "视频流从配置文件 CameraURI 读取";
+    hint.textContent = "已读取带框 RTSP 源流，启动 WebRTC 转发后显示";
+    hint.style.display = "grid";
+    frame.removeAttribute("src");
   }
 }
 
 function refreshVideo() {
-  const playlist = document.getElementById("playlistPath").textContent;
-  if (!playlist || playlist === "-") return;
-  const video = document.getElementById("videoPlayer");
-  video.src = `${playlist}?t=${Date.now()}`;
-  video.load();
+  const stream = document.getElementById("streamPath").textContent;
+  if (!stream || stream === "-") return;
+  const frame = document.getElementById("videoPlayer");
+  frame.src = `${stream}?t=${Date.now()}`;
+  document.getElementById("videoHint").style.display = "none";
 }
 
 function setWarningText(text) {
