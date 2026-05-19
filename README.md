@@ -11,6 +11,8 @@
 - UDP 感知结果上报。
 - 检测到目标后调用 LED 屏接口显示预警文本。
 - 取流无新帧超时自动重连，避免算法只处理一两帧后卡住。
+- 支持硬件编码后的带框 RTSP 推流，供 VLC、平台页面或其它客户端查看。
+- 提供局域网 Web 管理平台，支持配置修改、模型选择、阈值调整、运行监控、视频预览和预警发布。
 
 ## 目录结构
 
@@ -24,6 +26,7 @@ ffmedia_release/     FFMedia 头文件、示例和文档
 3rdparty/            第三方依赖源码或头文件
 build.sh             CMake 构建脚本
 CMakeLists.txt       主工程构建配置
+traffic_platform/    局域网 Web 管理平台
 ```
 
 运行时动态库、模型文件、构建目录和日志文件不提交到仓库，需要在目标设备上按实际环境准备。
@@ -48,6 +51,8 @@ cp config/DealRCF.example.cfg config/DealRCF.cfg
 
 ```cfg
 CameraURI = "rtsp://USER:PASSWORD@CAMERA_IP:554/Streaming/Channels/102";
+CameraShow = 4;
+RtspPushPort = 8554;
 RsuIp = "192.168.0.100";
 RsuPort = 30088;
 CloudIp = "192.168.0.101";
@@ -59,6 +64,26 @@ LedDeviceId = "";
 ```
 
 不要把真实 RTSP 账号密码、LED SDK 密钥或公网地址提交到仓库。
+
+视频显示相关配置：
+
+```cfg
+CameraShow = 1;       # 本机窗口显示
+CameraShow = 4;       # 启用带框 RTSP 推流
+RtspPushPort = 8554;  # 带框 RTSP 推流端口
+```
+
+当 `CameraShow = 4` 时，算法会在本机启动 RTSP Server，地址格式为：
+
+```text
+rtsp://设备IP:RtspPushPort/摄像头IP/camera
+```
+
+例如设备 IP 为 `192.168.88.30`、摄像头 IP 为 `192.168.88.33`、端口为 `8554` 时：
+
+```text
+rtsp://192.168.88.30:8554/192.168.88.33/camera
+```
 
 视觉配置文件：
 
@@ -101,6 +126,37 @@ cd output
 export LD_LIBRARY_PATH=../lib:$LD_LIBRARY_PATH
 ./cw_DealRCF_nebulalink ../config/DealRCF.cfg
 ```
+
+也可以通过平台页面启动、停止和重启算法。
+
+## 局域网管理平台
+
+平台源码位于 `traffic_platform/`，默认监听 `0.0.0.0:8080`。启动后局域网其它电脑可访问：
+
+```text
+http://设备IP:8080
+```
+
+启动平台：
+
+```bash
+./traffic_platform/scripts/start_platform.sh
+```
+
+安装开机自启：
+
+```bash
+./traffic_platform/scripts/install_service.sh
+```
+
+平台主要功能：
+
+- 修改 `config/DealRCF.cfg` 云平台、摄像头、LED、预警文字和 `RtspPushPort` 等配置。
+- 修改 `config/camera_config_lane.cfg` 模型、类别、检测阈值、NMS、ByteTrack 阈值。
+- 启动、停止、重启算法进程。
+- 查看 PID、内存、线程数、CPU 时间、运行时长。
+- 当 `CameraShow = 4` 时，优先将算法内部带框 RTSP 流转为 HLS，在页面视频监控中播放。
+- 发布和保存 LED 预警文字。
 
 ## 主流程
 
