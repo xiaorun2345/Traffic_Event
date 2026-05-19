@@ -28,6 +28,10 @@ compile_commands.json
 .libs/
 core
 core.*
+traffic_platform/backend/__pycache__/
+traffic_platform/runtime/logs/
+traffic_platform/runtime/hls/
+traffic_platform/runtime/backups/
 
 # 视频、发布包和超大产物
 *.deb

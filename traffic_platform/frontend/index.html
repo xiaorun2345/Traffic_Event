@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Traffic Event 管理平台</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Traffic Event 管理平台</h1>
+        <p>配置、模型、视频、预警与运行监控</p>
+      </div>
+      <div class="status-pill" id="runState">读取中</div>
+    </header>
+
+    <nav class="tabs">
+      <button data-tab="dashboard" class="active">首页监控</button>
+      <button data-tab="config">配置管理</button>
+      <button data-tab="model">模型管理</button>
+      <button data-tab="video">视频监控</button>
+      <button data-tab="warning">预警发布</button>
+      <button data-tab="logs">维护</button>
+    </nav>
+
+    <main>
+      <section id="dashboard" class="panel active">
+        <div class="grid metrics">
+          <article>
+            <span>算法状态</span>
+            <strong id="metricState">-</strong>
+          </article>
+          <article>
+            <span>PID</span>
+            <strong id="metricPid">-</strong>
+          </article>
+          <article>
+            <span>RSS 内存</span>
+            <strong id="metricRss">-</strong>
+          </article>
+          <article>
+            <span>CPU 时间</span>
+            <strong id="metricCpu">-</strong>
+          </article>
+          <article>
+            <span>线程数</span>
+            <strong id="metricThreads">-</strong>
+          </article>
+          <article>
+            <span>运行时长</span>
+            <strong id="metricUptime">-</strong>
+          </article>
+        </div>
+        <div class="actions">
+          <button onclick="processAction('start')">启动算法</button>
+          <button onclick="processAction('stop')">停止算法</button>
+          <button onclick="processAction('restart')" class="danger">重启算法</button>
+          <button onclick="loadAll()">刷新</button>
+        </div>
+        <pre id="statusDetail" class="logbox"></pre>
+      </section>
+
+      <section id="config" class="panel">
+        <form id="mainConfigForm" class="form-grid"></form>
+        <div class="actions">
+          <button onclick="saveMainConfig(false)">保存配置</button>
+          <button onclick="saveMainConfig(true)" class="danger">保存并重启算法</button>
+        </div>
+      </section>
+
+      <section id="model" class="panel">
+        <div class="toolbar">
+          <label>模型预设</label>
+          <select id="profileSelect"></select>
+          <button onclick="applyProfile()">应用预设</button>
+        </div>
+        <div class="toolbar">
+          <label>模型文件</label>
+          <select id="modelSelect"></select>
+          <button onclick="useSelectedModel()">使用该模型</button>
+        </div>
+        <form id="modelConfigForm" class="form-grid"></form>
+        <div class="actions">
+          <button onclick="saveModelConfig(false)">保存模型参数</button>
+          <button onclick="saveModelConfig(true)" class="danger">保存并重启算法</button>
+        </div>
+      </section>
+
+      <section id="video" class="panel">
+        <div class="video-wrap">
+          <video id="videoPlayer" controls muted playsinline></video>
+          <div class="video-placeholder" id="videoHint">点击“启动视频流”生成 /hls/live.m3u8</div>
+        </div>
+        <div class="actions">
+          <button onclick="videoAction('start')">启动视频流</button>
+          <button onclick="videoAction('stop')">停止视频流</button>
+          <button onclick="refreshVideo()">刷新播放器</button>
+        </div>
+        <p class="muted">播放地址：<code id="playlistPath">-</code></p>
+      </section>
+
+      <section id="warning" class="panel">
+        <label class="full">
+          预警文字
+          <textarea id="warningText" rows="4"></textarea>
+        </label>
+        <div class="quick">
+          <button onclick="setWarningText('您已超速，请减速慢行')">超速预警</button>
+          <button onclick="setWarningText('前方行人，请注意避让')">行人预警</button>
+          <button onclick="setWarningText('前方施工，请减速慢行')">施工预警</button>
+          <button onclick="setWarningText('前方有非机动车，请注意安全')">非机动车预警</button>
+        </div>
+        <div class="actions">
+          <button onclick="publishWarning(false)">保存预警文字</button>
+          <button onclick="publishWarning(true)" class="danger">保存并重启算法</button>
+        </div>
+        <table>
+          <thead><tr><th>时间</th><th>内容</th><th>结果</th></tr></thead>
+          <tbody id="warningHistory"></tbody>
+        </table>
+      </section>
+
+      <section id="logs" class="panel">
+        <h2>部署说明</h2>
+        <pre class="logbox">平台服务：traffic_platform/backend/app.py
+默认端口：8080
+局域网访问：http://设备IP:8080
+HLS 输出：traffic_platform/runtime/hls/live.m3u8
+配置备份：traffic_platform/runtime/backups/</pre>
+      </section>
+    </main>
+
+    <div id="toast"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>
