@@ -45,7 +45,7 @@ traffic_platform/
 
 ## 注意
 
-- 带框视频流地址格式为 `rtsp://设备IP:8554/摄像头IP/camera`。平台本机转 HLS 时使用 `rtsp://127.0.0.1:8554/摄像头IP/camera`。
+- 带框视频流地址格式为 `rtsp://设备IP:RtspPushPort/摄像头IP/camera`，端口由 `config/DealRCF.cfg` 里的 `RtspPushPort` 配置，默认 `8554`。
 - 浏览器不一定原生支持 HLS。如果页面不能直接播放，可用 VLC 打开：
 
 ```text

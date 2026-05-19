@@ -169,6 +169,7 @@ typedef struct DealInfo
     string PortName;
     int BaudRate;
     int CameraShow;
+    int RtspPushPort;
     e_SaveDataType IsSaveData; //是否保存数据
     int SendTime;
     int IsPadDebug;

@@ -49,6 +49,7 @@ MAIN_NODE_FIELDS = [
     "LedSdkKey",
     "LedSdkSecret",
     "LedDeviceId",
+    "RtspPushPort",
     "RtspTransport",
     "SourceTimeoutSec",
     "ReconnectTimes",
@@ -488,7 +489,8 @@ def configured_video_source(config):
     except (TypeError, ValueError):
         camera_show = 0
     if camera_show == 4 and source:
-        return f"rtsp://127.0.0.1:8554/{push_rtsp_suffix(source)}"
+        port = config.get("RtspPushPort", 8554) or 8554
+        return f"rtsp://127.0.0.1:{port}/{push_rtsp_suffix(source)}"
     return source
 
 

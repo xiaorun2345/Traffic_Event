@@ -117,11 +117,12 @@ std::string ExtractRtspStreamName(const std::string& uri)
 class HardwareRtspStreamer
 {
 public:
-	bool Start(const std::string& suffix, int width, int height)
+	bool Start(const std::string& suffix, int port, int width, int height)
 	{
 		if (started_)
 			return true;
 
+		port_ = port > 0 ? port : kPushRtspPort;
 		width_ = width;
 		height_ = height;
 		if (width_ <= 0 || height_ <= 0)
@@ -132,9 +133,9 @@ public:
 
 		event_loop_.reset(new xop::EventLoop());
 		server_ = xop::RtspServer::Create(event_loop_.get());
-		if (!server_->Start("0.0.0.0", kPushRtspPort))
+		if (!server_->Start("0.0.0.0", port_))
 		{
-			std::cout << "RTSP push server listen on " << kPushRtspPort << " failed." << std::endl;
+			std::cout << "RTSP push server listen on " << port_ << " failed." << std::endl;
 			server_.reset();
 			event_loop_.reset();
 			return false;
@@ -164,7 +165,7 @@ public:
 		yuv_size_ = width_ * height_ * 3 / 2;
 		suffix_ = suffix;
 		started_ = true;
-		std::cout << "RTSP push stream ready: rtsp://127.0.0.1:" << kPushRtspPort
+		std::cout << "RTSP push stream ready: rtsp://127.0.0.1:" << port_
 		          << "/" << suffix_ << std::endl;
 		return true;
 	}
@@ -200,6 +201,7 @@ public:
 
 private:
 	bool started_ = false;
+	int port_ = kPushRtspPort;
 	int width_ = 0;
 	int height_ = 0;
 	int yuv_size_ = 0;
@@ -321,6 +323,9 @@ bool DealRCF::LoadConfig(const char *filename)
 		DealRCF::deal_info_.CameraURI = CameraURI;
 		DealRCF::deal_info_.CameraShow = CameraShow;
 		DealRCF::deal_info_.SendTime = SendTime;
+		if(!rsu.lookupValue("RtspPushPort", DealRCF::deal_info_.RtspPushPort) || DealRCF::deal_info_.RtspPushPort <= 0){
+			DealRCF::deal_info_.RtspPushPort = kPushRtspPort;
+		}
 		if(!rsu.lookupValue("RtspTransport", DealRCF::deal_info_.RtspTransport) || DealRCF::deal_info_.RtspTransport.empty()){
 			DealRCF::deal_info_.RtspTransport = "tcp";
 		}
@@ -402,6 +407,7 @@ bool DealRCF::LoadConfig(const char *filename)
 	cout << "IsSaveData: " << DealRCF::deal_info_.IsSaveData << endl;
 	cout << "SendTime: " << DealRCF::deal_info_.SendTime << endl;
 	cout << "GetMatMode: " << DealRCF::deal_info_.GetMatMode << endl;
+	cout << "RtspPushPort: " << DealRCF::deal_info_.RtspPushPort << endl;
 	cout << "RtspTransport: " << DealRCF::deal_info_.RtspTransport << endl;
 	cout << "ReconnectTimes: " << DealRCF::deal_info_.ReconnectTimes << endl;
 	cout << "SourceTimeoutSec: " << DealRCF::deal_info_.SourceTimeoutSec << endl;
@@ -518,7 +524,8 @@ void *DealRCF::CameraDealThread(void *arg)
 	if(is_push_rtsp)
 	{
 		rtsp_suffix = ExtractRtspStreamName(DealRCF::deal_info_.CameraURI) + "/camera";
-		std::cout << "push live stream uri: rtsp://127.0.0.1:8554/" << rtsp_suffix << std::endl;
+		std::cout << "push live stream uri: rtsp://127.0.0.1:" << DealRCF::deal_info_.RtspPushPort
+		          << "/" << rtsp_suffix << std::endl;
 	}
 
 	while (true)
@@ -560,7 +567,7 @@ void *DealRCF::CameraDealThread(void *arg)
 		if(is_push_rtsp)
 		{
 			if(!rtsp_streamer_started)
-				rtsp_streamer_started = rtsp_streamer.Start(rtsp_suffix, img.cols, img.rows);
+				rtsp_streamer_started = rtsp_streamer.Start(rtsp_suffix, DealRCF::deal_info_.RtspPushPort, img.cols, img.rows);
 			if(rtsp_streamer_started)
 				rtsp_streamer.Push(img);
 		}
