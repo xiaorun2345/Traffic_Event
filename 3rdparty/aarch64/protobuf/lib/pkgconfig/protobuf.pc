@@ -1,0 +1,12 @@
+prefix=/home/linaro/yolov5_to_trt-sdk/3rdparty/protobuf-3.8.0/install
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: Protocol Buffers
+Description: Google's Data Interchange Format
+Version: 3.8.0
+Libs: -L${libdir} -lprotobuf 
+Libs.private: -lz 
+Cflags: -I${includedir} -pthread
+Conflicts: protobuf-lite
