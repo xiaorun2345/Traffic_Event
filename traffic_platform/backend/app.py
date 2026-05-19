@@ -473,9 +473,12 @@ def video_pid():
 
 def video_status():
     pid = video_pid()
+    config = read_main_config()
+    source = str(config.get("CameraURI", "")).strip()
     return {
         "running": bool(pid),
         "pid": pid,
+        "source": source,
         "playlist": "/hls/live.m3u8" if (HLS_ROOT / "live.m3u8").exists() else None,
     }
 

@@ -206,9 +206,12 @@ async function videoAction(action) {
 
 function updateVideoInfo(video) {
   const playlist = video.playlist || "-";
+  document.getElementById("sourcePath").textContent = video.source || "-";
   document.getElementById("playlistPath").textContent = playlist;
   if (video.playlist) {
     document.getElementById("videoHint").textContent = "如果浏览器不支持 HLS，可用 VLC 打开该地址";
+  } else if (video.source) {
+    document.getElementById("videoHint").textContent = "视频流从配置文件 CameraURI 读取";
   }
 }
 
