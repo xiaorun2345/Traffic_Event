@@ -19,6 +19,4 @@ srt: no
 
 paths:
   boxed:
-    source: 'rtsp://127.0.0.1:8554/192.168.88.33/camera'
-    sourceOnDemand: yes
-    rtspTransport: tcp
+    source: publisher

@@ -14,7 +14,7 @@ http://设备IP:8080
 - 启动、停止、重启 `output/cw_DealRCF_nebulalink`。
 - 监控算法进程 PID、RSS 内存、VMS、线程数、CPU 时间、运行时长。
 - 当 `CameraShow = 4` 时，算法会在本机 `RtspPushPort` 端口推送硬件编码后的带框 RTSP 流。
-- 视频监控页面通过 MediaMTX 将带框 RTSP 转成 WebRTC 播放，不使用 HLS 或 MJPEG。
+- 视频监控页面通过 FFmpeg copy 模式将带框 RTSP 发布到 MediaMTX，再由 MediaMTX 转成 WebRTC 播放，不使用 HLS 或 MJPEG，也不重编码。
 - 保存预警文字，可选择保存后重启算法。
 
 ## 启动
@@ -47,8 +47,9 @@ traffic_platform/
 ## 注意
 
 - 带框视频流地址格式为 `rtsp://设备IP:RtspPushPort/摄像头IP/camera`，端口由 `config/DealRCF.cfg` 里的 `RtspPushPort` 配置，默认 `8554`。
-- 浏览器不能直接播放 RTSP，平台会启动 MediaMTX，拉取本机带框 RTSP，并在 `http://设备IP:8889/boxed/` 输出 WebRTC 页面。
+- 浏览器不能直接播放 RTSP，平台会启动 MediaMTX，并用 FFmpeg 将本机带框 RTSP 原样发布到 MediaMTX，在 `http://设备IP:8889/boxed/` 输出 WebRTC 页面。
 - MediaMTX 的 RTSP 服务端口默认 `8555`，避免和算法带框 RTSP 推流端口 `8554` 冲突。
+- 转推地址为 `rtsp://127.0.0.1:8555/boxed`，页面播放地址为 `http://设备IP:8889/boxed/`。
 - 如果系统没有 `mediamtx` 命令，可将 Linux arm64 版二进制放到 `traffic_platform/mediamtx/mediamtx` 并赋予执行权限。
 - 也可以用脚本安装 MediaMTX，默认版本为 `v1.18.2`：
 

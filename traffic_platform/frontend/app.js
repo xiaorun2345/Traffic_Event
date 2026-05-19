@@ -223,7 +223,7 @@ function updateVideoInfo(video) {
   document.getElementById("sourcePath").textContent = video.source || "-";
   document.getElementById("streamPath").textContent = stream;
   const mediaState = video.installed
-    ? `${video.running ? "运行中" : "未运行"}，WebRTC:${video.webrtc_port || "-"}，RTSP:${video.rtsp_port || "-"}`
+    ? `${video.running ? "MediaMTX运行中" : "MediaMTX未运行"}，${video.relay_running ? "转推运行中" : "转推未运行"}，WebRTC:${video.webrtc_port || "-"}，RTSP:${video.rtsp_port || "-"}`
     : "未找到 mediamtx";
   document.getElementById("mediaState").textContent = mediaState;
   const hint = document.getElementById("videoHint");

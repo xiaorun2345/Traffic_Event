@@ -23,7 +23,11 @@ TARGET_DIR="${ROOT}/traffic_platform/mediamtx"
 TMP_FILE="/tmp/${ARCHIVE}"
 
 mkdir -p "${TARGET_DIR}"
-curl -L --fail -o "${TMP_FILE}" "${URL}"
+if command -v wget >/dev/null 2>&1; then
+  wget -4 -O "${TMP_FILE}" "${URL}"
+else
+  curl -4 -L --fail -o "${TMP_FILE}" "${URL}"
+fi
 tar -xzf "${TMP_FILE}" -C "${TARGET_DIR}" mediamtx
 chmod +x "${TARGET_DIR}/mediamtx"
 "${TARGET_DIR}/mediamtx" --version

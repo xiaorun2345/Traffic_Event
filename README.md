@@ -155,7 +155,7 @@ http://设备IP:8080
 - 修改 `config/camera_config_lane.cfg` 模型、类别、检测阈值、NMS、ByteTrack 阈值。
 - 启动、停止、重启算法进程。
 - 查看 PID、内存、线程数、CPU 时间、运行时长。
-- 当 `CameraShow = 4` 时，平台通过 MediaMTX 将算法内部带框 RTSP 转成 WebRTC，在页面视频监控中显示，不使用 HLS 或 MJPEG。
+- 当 `CameraShow = 4` 时，平台用 FFmpeg copy 模式把算法内部带框 RTSP 发布到 MediaMTX，再由 MediaMTX 转成 WebRTC 在页面视频监控中显示，不使用 HLS 或 MJPEG。
 - 发布和保存 LED 预警文字。
 
 ## 主流程
