@@ -71,6 +71,8 @@ LedDeviceId = "";
 CameraShow = 1;       # 本机窗口显示
 CameraShow = 4;       # 启用带框 RTSP 推流
 RtspPushPort = 8554;  # 带框 RTSP 推流端口
+RtspOutputWidth = 1280;
+RtspOutputHeight = 720; # 平台预览推流分辨率，降低浏览器解码压力
 ```
 
 当 `CameraShow = 4` 时，算法会在本机启动 RTSP Server，地址格式为：

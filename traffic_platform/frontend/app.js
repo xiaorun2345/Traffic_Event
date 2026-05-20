@@ -2,7 +2,7 @@ const mainFields = [
   "CameraConfig", "RsuIp", "RsuPort", "CloudIp", "CloudPort", "CameraURI",
   "CameraShow", "SendTime", "LedWarningText", "LedIp", "LedPort",
   "LedSdkKey", "LedSdkSecret", "LedDeviceId", "RtspPushPort", "RtspTransport",
-  "SourceTimeoutSec", "ReconnectTimes", "CameraLength", "CameraWidth",
+  "RtspOutputWidth", "RtspOutputHeight", "SourceTimeoutSec", "ReconnectTimes", "CameraLength", "CameraWidth",
   "location_angle", "location_longitude", "location_latitude", "IsGcj02"
 ];
 
@@ -22,6 +22,8 @@ const fieldNames = {
   LedSdkSecret: "LED SDK Secret",
   LedDeviceId: "LED 设备 ID",
   RtspPushPort: "带框 RTSP 端口",
+  RtspOutputWidth: "平台预览宽度",
+  RtspOutputHeight: "平台预览高度",
   RtspTransport: "RTSP 协议",
   SourceTimeoutSec: "无帧超时秒数",
   ReconnectTimes: "重连次数",

@@ -170,6 +170,8 @@ typedef struct DealInfo
     int BaudRate;
     int CameraShow;
     int RtspPushPort;
+    int RtspOutputWidth;
+    int RtspOutputHeight;
     e_SaveDataType IsSaveData; //是否保存数据
     int SendTime;
     int IsPadDebug;

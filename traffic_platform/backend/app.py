@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -8,10 +10,12 @@ import signal
 import subprocess
 import time
 from datetime import datetime
+from email.utils import formatdate
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
+from urllib.request import Request, urlopen
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -55,6 +59,8 @@ MAIN_NODE_FIELDS = [
     "LedSdkSecret",
     "LedDeviceId",
     "RtspPushPort",
+    "RtspOutputWidth",
+    "RtspOutputHeight",
     "RtspTransport",
     "SourceTimeoutSec",
     "ReconnectTimes",
@@ -353,6 +359,9 @@ def apply_model_profile(profile_name):
 
 
 def find_algorithm_pid():
+    binary_pid = find_process_by_token(ALGORITHM_NAME)
+    if binary_pid:
+        return binary_pid
     if ALGORITHM_PID_FILE.exists():
         try:
             pid = int(ALGORITHM_PID_FILE.read_text().strip())
@@ -360,15 +369,20 @@ def find_algorithm_pid():
                 return pid
         except Exception:
             pass
+    return find_process_by_token(RUN_SCRIPT.name)
+
+
+def find_process_by_token(token):
     for proc in Path("/proc").iterdir():
         if not proc.name.isdigit():
             continue
         cmdline_path = proc / "cmdline"
         try:
-            cmdline = cmdline_path.read_bytes().replace(b"\x00", b" ").decode("utf-8", "ignore")
+            raw = cmdline_path.read_bytes()
         except Exception:
             continue
-        if ALGORITHM_NAME in cmdline:
+        parts = [item.decode("utf-8", "ignore") for item in raw.split(b"\x00") if item]
+        if any(Path(part).name == token for part in parts):
             return int(proc.name)
     return None
 
@@ -665,6 +679,85 @@ def add_warning_record(text, result):
     return history[:100]
 
 
+def build_led_program(text, device_id):
+    areas = []
+    colors = ["#ff0000", "#ffff00", "#0000ff"]
+    for index, color in enumerate(colors):
+        areas.append({
+            "x": index * 32,
+            "y": 0,
+            "width": 32,
+            "height": 96,
+            "border": {"type": 0, "speed": 5, "effect": "rotate"},
+            "item": [{
+                "type": "text",
+                "string": text,
+                "multiLine": True,
+                "PlayText": False,
+                "font": {
+                    "name": "宋体",
+                    "size": 14,
+                    "underline": False,
+                    "bold": False,
+                    "italic": False,
+                    "color": color,
+                },
+                "effect": {"type": 0, "speed": 5, "hold": 5000},
+            }],
+        })
+    return {
+        "method": "replace",
+        "id": device_id,
+        "data": [{
+            "name": "节目1",
+            "type": "normal",
+            "uuid": "A3",
+            "area": areas,
+        }],
+    }
+
+
+def publish_led_text(text, config):
+    led_ip = str(config.get("LedIp", "")).strip()
+    led_port = int(config.get("LedPort", 0) or 0)
+    sdk_key = str(config.get("LedSdkKey", "") or "")
+    sdk_secret = str(config.get("LedSdkSecret", "") or "")
+    device_id = str(config.get("LedDeviceId", "") or "")
+    if not led_ip or led_port <= 0:
+        return {"ok": False, "result": "LED 配置缺少 IP 或端口"}
+    if not sdk_key or not sdk_secret or not device_id:
+        return {"ok": False, "result": "LED 配置缺少 SDK Key/Secret/DeviceId"}
+
+    body = json.dumps(build_led_program(text, device_id), ensure_ascii=False, separators=(",", ":"))
+    date = formatdate(timeval=None, localtime=False, usegmt=True)
+    request_id = f"{int(time.time() * 1000):x}-{os.getpid():x}"
+    sign = hmac.new(sdk_secret.encode("utf-8"), (body + sdk_key + date).encode("utf-8"), hashlib.md5).hexdigest()
+    url = f"http://{led_ip}:{led_port}/api/program/"
+    request = Request(url, data=body.encode("utf-8"), method="POST", headers={
+        "requestId": request_id,
+        "sdkKey": sdk_key,
+        "date": date,
+        "sign": sign,
+        "Content-Type": "application/json",
+    })
+    try:
+        with urlopen(request, timeout=5) as response:
+            response_body = response.read().decode("utf-8", "ignore")
+            status = response.getcode()
+    except Exception as exc:
+        return {"ok": False, "result": f"LED 下发失败: {exc}"}
+
+    if status < 200 or status >= 300:
+        return {"ok": False, "result": f"LED HTTP {status}: {response_body}"}
+    try:
+        payload = json.loads(response_body or "{}")
+    except Exception:
+        return {"ok": False, "result": f"LED 返回非 JSON: {response_body}"}
+    if payload.get("message") == "ok":
+        return {"ok": True, "result": "LED 已下发"}
+    return {"ok": False, "result": f"LED 拒绝: {response_body}"}
+
+
 def response_payload(data=None, ok=True, error=None, status=200):
     payload = {"ok": ok}
     if data is not None:
@@ -794,14 +887,16 @@ class PlatformHandler(SimpleHTTPRequestHandler):
                 self.send_json(*response_payload(ok=False, error="warning text is empty", status=400))
                 return
             backup = update_group_values(MAIN_CONFIG, "node", {"LedWarningText": text})
-            result = "saved to config"
+            config = read_main_config()
+            led_result = publish_led_text(text, config)
+            result = f"saved to config; {led_result['result']}"
             if body.get("restart"):
                 stop_algorithm()
                 time.sleep(1)
                 start_algorithm()
-                result = "saved to config and restarted algorithm"
+                result += "; restarted algorithm"
             history = add_warning_record(text, result)
-            self.send_json(*response_payload({"backup": backup, "result": result, "history": history}))
+            self.send_json(*response_payload({"backup": backup, "result": result, "led": led_result, "history": history}))
         else:
             self.send_json(*response_payload(ok=False, error="not found", status=404))
 

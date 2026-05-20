@@ -164,6 +164,7 @@ public:
 		encoded_.resize(static_cast<size_t>(width_) * static_cast<size_t>(height_) * 3);
 		yuv_size_ = width_ * height_ * 3 / 2;
 		suffix_ = suffix;
+		rtp_timestamp_ = xop::H264Source::GetTimestamp();
 		started_ = true;
 		std::cout << "RTSP push stream ready: rtsp://127.0.0.1:" << port_
 		          << "/" << suffix_ << std::endl;
@@ -194,7 +195,8 @@ public:
 		xop::AVFrame video_frame(length);
 		video_frame.type = 0;
 		video_frame.size = static_cast<uint32_t>(length);
-		video_frame.timestamp = xop::H264Source::GetTimestamp();
+		video_frame.timestamp = rtp_timestamp_;
+		rtp_timestamp_ += 90000 / kPushRtspFps;
 		memcpy(video_frame.buffer.get(), encoded_.data(), static_cast<size_t>(length));
 		return server_->PushFrame(session_id_, xop::channel_0, video_frame);
 	}
@@ -211,6 +213,7 @@ private:
 	xop::MediaSessionId session_id_ = 0;
 	std::unique_ptr<whale::vision::MppEncoder> encoder_;
 	std::vector<char> encoded_;
+	uint32_t rtp_timestamp_ = 0;
 };
 }
 
@@ -326,6 +329,12 @@ bool DealRCF::LoadConfig(const char *filename)
 		if(!rsu.lookupValue("RtspPushPort", DealRCF::deal_info_.RtspPushPort) || DealRCF::deal_info_.RtspPushPort <= 0){
 			DealRCF::deal_info_.RtspPushPort = kPushRtspPort;
 		}
+		if(!rsu.lookupValue("RtspOutputWidth", DealRCF::deal_info_.RtspOutputWidth) || DealRCF::deal_info_.RtspOutputWidth <= 0){
+			DealRCF::deal_info_.RtspOutputWidth = DealRCF::deal_info_.CameraLength;
+		}
+		if(!rsu.lookupValue("RtspOutputHeight", DealRCF::deal_info_.RtspOutputHeight) || DealRCF::deal_info_.RtspOutputHeight <= 0){
+			DealRCF::deal_info_.RtspOutputHeight = DealRCF::deal_info_.CameraWidth;
+		}
 		if(!rsu.lookupValue("RtspTransport", DealRCF::deal_info_.RtspTransport) || DealRCF::deal_info_.RtspTransport.empty()){
 			DealRCF::deal_info_.RtspTransport = "tcp";
 		}
@@ -408,6 +417,8 @@ bool DealRCF::LoadConfig(const char *filename)
 	cout << "SendTime: " << DealRCF::deal_info_.SendTime << endl;
 	cout << "GetMatMode: " << DealRCF::deal_info_.GetMatMode << endl;
 	cout << "RtspPushPort: " << DealRCF::deal_info_.RtspPushPort << endl;
+	cout << "RtspOutputWidth: " << DealRCF::deal_info_.RtspOutputWidth << endl;
+	cout << "RtspOutputHeight: " << DealRCF::deal_info_.RtspOutputHeight << endl;
 	cout << "RtspTransport: " << DealRCF::deal_info_.RtspTransport << endl;
 	cout << "ReconnectTimes: " << DealRCF::deal_info_.ReconnectTimes << endl;
 	cout << "SourceTimeoutSec: " << DealRCF::deal_info_.SourceTimeoutSec << endl;
@@ -567,7 +578,11 @@ void *DealRCF::CameraDealThread(void *arg)
 		if(is_push_rtsp)
 		{
 			if(!rtsp_streamer_started)
-				rtsp_streamer_started = rtsp_streamer.Start(rtsp_suffix, DealRCF::deal_info_.RtspPushPort, img.cols, img.rows);
+			{
+				int push_width = DealRCF::deal_info_.RtspOutputWidth > 0 ? DealRCF::deal_info_.RtspOutputWidth : img.cols;
+				int push_height = DealRCF::deal_info_.RtspOutputHeight > 0 ? DealRCF::deal_info_.RtspOutputHeight : img.rows;
+				rtsp_streamer_started = rtsp_streamer.Start(rtsp_suffix, DealRCF::deal_info_.RtspPushPort, push_width, push_height);
+			}
 			if(rtsp_streamer_started)
 				rtsp_streamer.Push(img);
 		}
