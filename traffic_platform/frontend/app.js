@@ -52,6 +52,8 @@ let mainConfig = {};
 let modelConfig = { gie: {}, tracker: {} };
 let profiles = [];
 let models = [];
+let roiPoints = [];
+let roiImageReady = false;
 
 document.querySelectorAll(".tabs button").forEach((button) => {
   button.addEventListener("click", () => {
@@ -179,8 +181,15 @@ async function loadWarnings() {
   renderWarnings(data || []);
 }
 
+async function loadRoiConfig() {
+  const data = await api("/api/roi-config");
+  roiPoints = Array.isArray(data.points) ? data.points : [];
+  setText("roiConfigPath", data.config || "-");
+  renderRoiState();
+}
+
 async function loadAll() {
-  await Promise.all([loadStatus(), loadMainConfig(), loadModelConfig(), loadModels(), loadWarnings()]);
+  await Promise.all([loadStatus(), loadMainConfig(), loadModelConfig(), loadModels(), loadWarnings(), loadRoiConfig()]);
 }
 
 function renderForm(id, fields, values) {
@@ -241,6 +250,132 @@ function renderModelSummary(values) {
   setText("modelConfidence", values["pre-cluster-threshold"] ?? "-");
   setText("modelNms", values.nms_iou_threshold ?? "-");
   setText("modelTrack", values.high_thresh ?? values.low_thresh ?? "-");
+}
+
+function getRoiNodes() {
+  return {
+    image: document.getElementById("roiImage"),
+    canvas: document.getElementById("roiCanvas"),
+    empty: document.getElementById("roiEmpty")
+  };
+}
+
+function loadRoiSnapshot() {
+  const { image, empty } = getRoiNodes();
+  if (!image) return;
+  roiImageReady = false;
+  if (empty) {
+    empty.textContent = "画面加载中";
+    empty.style.display = "grid";
+  }
+  image.onload = () => {
+    roiImageReady = true;
+    if (empty) empty.style.display = "none";
+    syncRoiCanvas();
+    renderRoiState();
+  };
+  image.onerror = () => {
+    roiImageReady = false;
+    if (empty) {
+      empty.textContent = "画面获取失败";
+      empty.style.display = "grid";
+    }
+    toast("ROI 画面获取失败");
+  };
+  image.src = `/api/roi-snapshot?t=${Date.now()}`;
+}
+
+function syncRoiCanvas() {
+  const { image, canvas } = getRoiNodes();
+  if (!image || !canvas) return;
+  const width = image.clientWidth || image.parentElement?.clientWidth || 0;
+  const height = image.clientHeight || image.parentElement?.clientHeight || 0;
+  if (!width || !height) return;
+  if (canvas.width !== Math.round(width)) canvas.width = Math.round(width);
+  if (canvas.height !== Math.round(height)) canvas.height = Math.round(height);
+  drawRoi();
+}
+
+function roiDisplayPoint(point) {
+  const { image, canvas } = getRoiNodes();
+  const naturalWidth = image?.naturalWidth || 1;
+  const naturalHeight = image?.naturalHeight || 1;
+  return {
+    x: point.x / naturalWidth * canvas.width,
+    y: point.y / naturalHeight * canvas.height
+  };
+}
+
+function drawRoi() {
+  const { canvas } = getRoiNodes();
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!roiImageReady || !roiPoints.length) return;
+
+  const points = roiPoints.map(roiDisplayPoint);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#16c7ff";
+  ctx.fillStyle = "rgba(22, 199, 255, 0.18)";
+  ctx.beginPath();
+  points.forEach((point, index) => {
+    if (index === 0) ctx.moveTo(point.x, point.y);
+    else ctx.lineTo(point.x, point.y);
+  });
+  if (points.length >= 3) ctx.closePath();
+  if (points.length >= 3) ctx.fill();
+  ctx.stroke();
+
+  points.forEach((point, index) => {
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = index === 0 ? "#31f26b" : "#16c7ff";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#02111f";
+    ctx.stroke();
+  });
+}
+
+function renderRoiState() {
+  const { image } = getRoiNodes();
+  setText("roiPointCount", String(roiPoints.length));
+  setText("roiImageSize", image?.naturalWidth ? `${image.naturalWidth} x ${image.naturalHeight}` : "-");
+  const text = roiPoints.map((point, index) => `${index + 1}. ${point.x}, ${point.y}`).join("\n");
+  setText("roiPointsText", text || "-");
+  syncRoiCanvas();
+}
+
+function addRoiPoint(event) {
+  if (!roiImageReady) return;
+  const { image, canvas } = getRoiNodes();
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.round((event.clientX - rect.left) / rect.width * image.naturalWidth);
+  const y = Math.round((event.clientY - rect.top) / rect.height * image.naturalHeight);
+  roiPoints.push({ x: Math.max(0, x), y: Math.max(0, y) });
+  renderRoiState();
+}
+
+function undoRoiPoint() {
+  roiPoints.pop();
+  renderRoiState();
+}
+
+function clearRoi() {
+  roiPoints = [];
+  renderRoiState();
+}
+
+async function saveRoiConfig(restart) {
+  if (roiPoints.length < 4) {
+    toast("ROI 至少需要 4 个点");
+    return;
+  }
+  const data = await api("/api/roi-config", { method: "POST", body: { points: roiPoints, restart } });
+  roiPoints = data.config?.points || roiPoints;
+  renderRoiState();
+  if (restart) await loadStatus();
+  toast(restart ? "ROI 已保存并重启算法" : "ROI 已保存");
 }
 
 async function processAction(action, showToast = true) {
@@ -351,6 +486,8 @@ updateClock();
 document.querySelectorAll("#warningText, #warningTextPanel").forEach((node) => {
   node.addEventListener("input", () => syncWarningTextInputs(node.value, node.id));
 });
+document.getElementById("roiCanvas")?.addEventListener("click", addRoiPoint);
+window.addEventListener("resize", syncRoiCanvas);
 loadAll().catch((error) => toast(error.message));
 setInterval(updateClock, 1000);
 setInterval(() => loadStatus().catch(() => {}), 5000);

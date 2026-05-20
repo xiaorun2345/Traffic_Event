@@ -237,6 +237,131 @@ def update_group_values(path, group_name, values):
     return backup
 
 
+def assignment_block_range(text, group_name, key):
+    group_start, group_end = group_range(text, group_name)
+    group = text[group_start:group_end]
+    match = re.search(rf"(?m)^(\s*){re.escape(key)}\s*=\s*\(", group)
+    if not match:
+        return None
+    open_pos = group.find("(", match.start(), match.end())
+    depth = 0
+    in_string = False
+    escaped = False
+    in_comment = False
+    for idx in range(open_pos, len(group)):
+        ch = group[idx]
+        if in_comment:
+            if ch == "\n":
+                in_comment = False
+            continue
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == "#":
+            in_comment = True
+        elif ch == '"':
+            in_string = True
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                end = idx + 1
+                while end < len(group) and group[end].isspace():
+                    end += 1
+                if end < len(group) and group[end] == ";":
+                    end += 1
+                return group_start + match.start(), group_start + end, match.group(1)
+    raise ValueError(f"assignment not closed: {group_name}.{key}")
+
+
+def parse_roi_points(raw):
+    values = [item.strip() for item in raw.split(";") if item.strip()]
+    if len(values) % 2 != 0:
+        raise ValueError("roi_points must contain x/y pairs")
+    points = []
+    for index in range(0, len(values), 2):
+        points.append({"x": int(round(float(values[index]))), "y": int(round(float(values[index + 1])))})
+    return points
+
+
+def format_roi_points(points):
+    values = []
+    for point in points:
+        values.extend([str(int(round(float(point["x"])))), str(int(round(float(point["y"]))))])
+    return ";".join(values)
+
+
+def read_roi_config():
+    text = read_text(CAMERA_CONFIG)
+    block_info = assignment_block_range(text, "NL_config", "roi")
+    polygons = []
+    if block_info:
+        start, end, _ = block_info
+        block = text[start:end]
+        for match in re.finditer(r'(?m)^(?!\s*#)\s*roi_points\s*=\s*"([^"]*)";', block):
+            polygons.append(parse_roi_points(match.group(1)))
+    width = None
+    height = None
+    all_points = [point for polygon in polygons for point in polygon]
+    if all_points:
+        width = max(point["x"] for point in all_points) + 1
+        height = max(point["y"] for point in all_points) + 1
+    return {
+        "points": polygons[0] if polygons else [],
+        "polygons": polygons,
+        "width": width,
+        "height": height,
+        "config": str(CAMERA_CONFIG.relative_to(PROJECT_ROOT)),
+    }
+
+
+def validate_roi_points(points):
+    if not isinstance(points, list) or len(points) < 4:
+        raise ValueError("ROI 至少需要 4 个点")
+    normalized = []
+    for point in points:
+        x = int(round(float(point.get("x"))))
+        y = int(round(float(point.get("y"))))
+        if x < 0 or y < 0:
+            raise ValueError("ROI 坐标不能为负数")
+        normalized.append({"x": x, "y": y})
+    return normalized
+
+
+def update_roi_config(points):
+    points = validate_roi_points(points)
+    text = read_text(CAMERA_CONFIG)
+    backup = backup_file(CAMERA_CONFIG)
+    block_info = assignment_block_range(text, "NL_config", "roi")
+    roi_text = format_roi_points(points)
+    if block_info:
+        start, end, indent = block_info
+    else:
+        group_start, group_end = group_range(text, "NL_config")
+        start = text.rfind("}", group_start, group_end)
+        end = start
+        indent = "    "
+    block = (
+        f"{indent}roi = (\n"
+        f"{indent}    {{\n"
+        f"{indent}        roi_points = \"{roi_text}\";\n"
+        f"{indent}    }}\n"
+        f"{indent});"
+    )
+    if block_info:
+        replacement = block
+    else:
+        replacement = block + "\n\n"
+    write_text_atomic(CAMERA_CONFIG, text[:start] + replacement + text[end:])
+    return backup, read_roi_config()
+
+
 def validate_thresholds(values):
     errors = []
     for key in FLOAT_LIMIT_FIELDS:
@@ -668,6 +793,31 @@ def stop_video():
     return {"stopped": bool(pid or relay_pid), "pid": pid, "relay_pid": relay_pid}
 
 
+def capture_roi_snapshot():
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise FileNotFoundError("未找到 ffmpeg，无法抓取画面")
+    config = read_main_config()
+    source = str(config.get("CameraURI", "")).strip()
+    if not source:
+        raise ValueError("CameraURI is empty")
+    target = RUNTIME_ROOT / "roi_snapshot.jpg"
+    cmd = [ffmpeg, "-hide_banner", "-loglevel", "error"]
+    if source.lower().startswith("rtsp://"):
+        cmd.extend(["-rtsp_transport", str(config.get("RtspTransport", "tcp") or "tcp")])
+    cmd.extend(["-y", "-i", source, "-frames:v", "1", "-q:v", "3", str(target)])
+    try:
+        subprocess.run(cmd, cwd=str(PROJECT_ROOT), stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10, check=True)
+    except subprocess.CalledProcessError as exc:
+        message = exc.stderr.decode("utf-8", "ignore").strip() or "ffmpeg snapshot failed"
+        raise RuntimeError(message)
+    except subprocess.TimeoutExpired:
+        raise TimeoutError("抓取画面超时")
+    if not target.exists() or target.stat().st_size == 0:
+        raise RuntimeError("抓取画面失败")
+    return target
+
+
 def add_warning_record(text, result):
     history = read_json(WARNING_HISTORY_FILE, [])
     history.insert(0, {
@@ -774,6 +924,9 @@ class PlatformHandler(SimpleHTTPRequestHandler):
         try:
             parsed = urlparse(self.path)
             path = parsed.path
+            if path == "/api/roi-snapshot":
+                self.handle_roi_snapshot()
+                return
             if path.startswith("/api/"):
                 self.handle_api_get(path)
                 return
@@ -808,6 +961,18 @@ class PlatformHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def send_binary(self, status, data, content_type):
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def handle_roi_snapshot(self):
+        target = capture_roi_snapshot()
+        self.send_binary(200, target.read_bytes(), "image/jpeg")
+
     def serve_file(self, root, relative, content_type):
         relative = unquote(relative).strip("/")
         target = (root / relative).resolve()
@@ -839,6 +1004,8 @@ class PlatformHandler(SimpleHTTPRequestHandler):
             self.send_json(*response_payload(read_main_config()))
         elif path == "/api/model-config":
             self.send_json(*response_payload(read_model_config()))
+        elif path == "/api/roi-config":
+            self.send_json(*response_payload(read_roi_config()))
         elif path == "/api/models":
             self.send_json(*response_payload({"models": scan_models(), "profiles": read_json(MODEL_PROFILE_FILE, default_model_profiles())}))
         elif path == "/api/video/status":
@@ -868,6 +1035,15 @@ class PlatformHandler(SimpleHTTPRequestHandler):
         elif path == "/api/model-profile/apply":
             backups = apply_model_profile(body.get("name", ""))
             self.send_json(*response_payload({"backups": backups, "config": read_model_config()}))
+        elif path == "/api/roi-config":
+            backup, config = update_roi_config(body.get("points", []))
+            result = {"backup": backup, "config": config}
+            if body.get("restart"):
+                stopped = stop_algorithm()
+                time.sleep(1)
+                started = start_algorithm()
+                result["restart"] = {"stop": stopped, "start": started}
+            self.send_json(*response_payload(result))
         elif path == "/api/process/start":
             self.send_json(*response_payload(start_algorithm()))
         elif path == "/api/process/stop":

@@ -650,6 +650,68 @@ textarea:focus {
   margin: 10px 0;
 }
 
+.roi-editor {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(56, 189, 248, 0.18);
+}
+
+.roi-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+}
+
+.roi-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #020713;
+}
+
+.roi-stage img,
+.roi-stage canvas,
+.roi-empty {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.roi-stage img {
+  display: block;
+  object-fit: contain;
+}
+
+.roi-stage canvas {
+  z-index: 2;
+  cursor: crosshair;
+}
+
+.roi-empty {
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  color: #cdeaff;
+  background: rgba(2, 7, 19, 0.78);
+}
+
+.roi-side {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.compact-log {
+  min-height: 220px;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 .logbox {
   min-height: 160px;
   padding: 14px;
@@ -756,7 +818,8 @@ td {
   .right-rail,
   .stream-info,
   .video-actions,
-  .toolbar {
+  .toolbar,
+  .roi-layout {
     grid-template-columns: 1fr;
   }
 }

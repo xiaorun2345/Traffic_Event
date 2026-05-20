@@ -105,6 +105,36 @@
               </div>
             </div>
             <form id="mainConfigForm" class="form-grid"></form>
+            <div class="roi-editor">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">Vision ROI</p>
+                  <h3>感兴趣区域</h3>
+                </div>
+                <div class="actions compact">
+                  <button onclick="loadRoiSnapshot()">获取画面</button>
+                  <button onclick="undoRoiPoint()">撤销点</button>
+                  <button onclick="clearRoi()">清空</button>
+                  <button onclick="saveRoiConfig(false)" class="primary">保存 ROI</button>
+                  <button onclick="saveRoiConfig(true)" class="danger">保存并重启算法</button>
+                </div>
+              </div>
+              <div class="roi-layout">
+                <div class="roi-stage">
+                  <img id="roiImage" alt="">
+                  <canvas id="roiCanvas"></canvas>
+                  <div id="roiEmpty" class="roi-empty">未加载画面</div>
+                </div>
+                <aside class="roi-side">
+                  <div class="param-list">
+                    <div><span>配置文件</span><strong id="roiConfigPath">-</strong></div>
+                    <div><span>点数量</span><strong id="roiPointCount">0</strong></div>
+                    <div><span>画面尺寸</span><strong id="roiImageSize">-</strong></div>
+                  </div>
+                  <pre id="roiPointsText" class="logbox compact-log"></pre>
+                </aside>
+              </div>
+            </div>
           </section>
 
           <section id="model" class="panel">
